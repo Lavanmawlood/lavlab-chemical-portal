@@ -3,58 +3,33 @@ import streamlit as st
 import pandas as pd
 import requests
 import urllib.parse
-import time
 
-# ڕێکخستنی لاپەڕەکە
-st.set_page_config(page_title="LAV LAB - Chemical Portal", layout="wide")
+st.set_page_config(page_title="LAV LAB - Raw Data Engine", layout="wide")
+st.title("🧪 LAV LAB: Raw Data Explorer")
 
-st.title("🧪 LAV LAB: Molecular Data Engine")
-
-def get_data(compound):
-    # ناوی ماددەکە دەکەین بە فۆرماتێکی پارێزراو
+def get_raw_data(compound):
     clean_name = urllib.parse.quote(compound.strip())
-    
-    # URL بۆ وەرگرتنی CID
+    # یەکەم داواکاری بۆ CID
     url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/cids/JSON"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            return None
-            
-        data = response.json()
-        if "IdentifierList" not in data:
-            return None
-            
-        cid = data["IdentifierList"]["CID"][0]
+        response = requests.get(url, timeout=10).json()
+        cid = response["IdentifierList"]["CID"][0]
         
-        # URL بۆ وەرگرتنی داتا
-        prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight/JSON"
-        prop_response = requests.get(prop_url, headers=headers, timeout=10)
-        prop_data = prop_response.json()
-        
-        result = prop_data["PropertyTable"]["Properties"][0]
-        result["CID"] = cid
-        return result
+        # دووەم داواکاری بۆ هەموو داتا بەردەستەکان
+        url_data = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight,XLogP3,IUPACName/JSON"
+        prop_response = requests.get(url_data, timeout=10).json()
+        return prop_response["PropertyTable"]["Properties"][0]
     except Exception as e:
-        return None
+        return {"Error": str(e)}
 
-# بەکارهێنانی ئەپەکە
-input_text = st.text_input("ناوی ماددەیەک بنووسە (بۆ نموونە: Lactic acid):")
-
-if st.button("شیکردنەوە"):
+input_text = st.text_input("ناوی ماددەکە بنووسە:")
+if st.button("شیکردنەوەی تەواو"):
     if input_text:
-        with st.spinner("سەرقاڵی گەڕان..."):
-            res = get_data(input_text)
-            if res:
-                st.success("سەرکەوتوو بوو!")
-                st.write(res)
-                # نیشاندانی وێنەکە
-                st.image(f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{res['CID']}/PNG")
-            else:
-                st.error("نەتوانرا هیچ داتایەک بۆ ئەم ماددەیە بدۆزرێتەوە. تکایە ناوی ئینگلیزییەکەی دڵنیابەرەوە.")
-    else:
-        st.warning("تکایە ناوی ماددەیەک بنووسە.")
+        data = get_raw_data(input_text)
+        st.write("### داتای خاوی وەرگیراو لە سێرڤەر:")
+        st.json(data) # ئەمە هەموو شتێک کە سێرڤەرەکە بیدات پیشانی دەدات
+        
+        if "CID" in data:
+            st.image(f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{data['CID']}/PNG")
 
 

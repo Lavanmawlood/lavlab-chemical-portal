@@ -79,10 +79,18 @@ OFFLINE_DATABASE = {
         "XLogP3": "-1.9",
         "IUPACName": "(5R)-5-[(1S)-1,2-dihydroxyethyl]-3,4-dihydroxy-5H-furan-2-one",
         "CID": 54670067
+    },
+    "lactic acid": {
+        "Title": "Lactic acid",
+        "MolecularFormula": "C3H6O3",
+        "MolecularWeight": "90.08",
+        "XLogP3": "-0.6",
+        "IUPACName": "2-hydroxypropanoic acid",
+        "CID": 612
     }
 }
 
-# لیستی User-Agents بۆ بڕینی بلۆکبوون
+# لیستی User-Agents بۆ پاراستنی هێڵەکە
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
@@ -131,12 +139,12 @@ def get_chemical_data_logic(compound_name: str) -> dict:
     """ناوی ماددەکە وەردەگرێت و داتاکانی لەناو داتابەیس یان بە ڕاستەوخۆ دەهێنێت."""
     normalized_name = compound_name.strip().lower()
     
-    # ئەگەر لە داتابەیسی لۆکاڵیدا هەبوو
+    # ١. ئەگەر لە داتابەیسی لۆکاڵیدا هەبوو
     if normalized_name in OFFLINE_DATABASE:
         logging.info(f"دۆزرایەوە لە لۆکاڵی: {normalized_name}")
         return OFFLINE_DATABASE[normalized_name]
         
-    # ئەگەر ماددەیەکی تر بوو
+    # ٢. ئەگەر ماددەیەکی تر بوو، سکراپینگی داینامیکی دەکەین
     clean_name = urllib.parse.quote(compound_name.strip())
     cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/cids/JSON"
     
@@ -147,8 +155,9 @@ def get_chemical_data_logic(compound_name: str) -> dict:
         
     cid = cid_data["IdentifierList"]["CID"][0]
     
-    properties = ["Title", "MolecularFormula", "MolecularWeight", "XLogP3"]
-    prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/{','.join(properties)}/JSON"
+    # کێشانی تایبەتمەندییە هەمیشە جێگیرەکان (بۆ ڕێگری لە ئیرۆری 400)
+    base_properties = ["Title", "MolecularFormula", "MolecularWeight"]
+    prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/{','.join(base_properties)}/JSON"
     prop_data = fetch_pubchem_direct(prop_url)
     
     if "PropertyTable" not in prop_data or not prop_data["PropertyTable"]["Properties"]:
@@ -156,6 +165,19 @@ def get_chemical_data_logic(compound_name: str) -> dict:
         
     final_properties = prop_data["PropertyTable"]["Properties"][0]
     final_properties["CID"] = cid
+    
+    # هەوڵدانێکی جیاواز و پارێزراو بۆ هێنانی XLogP3 تا پڕۆگرامەکە بەهۆی کایەی بەتاڵەوە نەڕوخێت
+    xlogp_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/XLogP3/JSON"
+    try:
+        xlogp_data = fetch_pubchem_direct(xlogp_url)
+        if "PropertyTable" in xlogp_data and xlogp_data["PropertyTable"]["Properties"]:
+            final_properties["XLogP3"] = xlogp_data["PropertyTable"]["Properties"][0].get("XLogP3", "N/A")
+        else:
+            final_properties["XLogP3"] = "N/A"
+    except Exception:
+        # ئەگەر ماددەکە XLogP3ی نەبوو یان ئیرۆری دا، تەنها وەک N/A دەینووسین
+        final_properties["XLogP3"] = "N/A"
+        
     return final_properties
 
 

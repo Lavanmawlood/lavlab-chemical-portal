@@ -5,15 +5,15 @@ import json
 import urllib.request
 import urllib.parse
 
-st.set_page_config(page_title="LAV LAB - Professional Engine", layout="wide")
+st.set_page_config(page_title="LAV LAB - Chemical Data", layout="wide")
 st.title("🧪 LAV LAB: Molecular Data Professional")
 
-# هێدەری فەرمی بۆ تێپەڕاندنی سیکیوریتی پوبچێم
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
 def get_data(name):
+    # پاککردنەوەی ناوی ماددەکە
     clean_name = urllib.parse.quote(name.strip())
-    # URL بۆ وەرگرتنی زانیارییەکان
+    # URLی فەرمی پوبچێم
     url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
     
     try:
@@ -24,21 +24,23 @@ def get_data(name):
             return {
                 "Title": props.get("Title", name),
                 "Formula": props.get("MolecularFormula", "N/A"),
-                "Weight": props.get("MolecularWeight", "N/A"),
+                "Weight": f"{props.get('MolecularWeight', 'N/A')} g/mol",
                 "LogP": props.get("XLogP3", "N/A")
             }
-    except Exception as e:
+    except:
         return None
 
-query = st.text_input("ناوی ماددە بنووسە (بە ئینگلیزی):")
+query = st.text_input("ناوی ماددە بنووسە (بۆ نموونە: Niacinamide, Retinol):")
+
 if st.button("شیکردنەوە"):
     if query:
-        data = get_data(query)
-        if data:
-            st.success(f"داتای {data['Title']} دۆزرایەوە:")
-            df = pd.DataFrame([data])
-            st.table(df)
-        else:
-            st.error("داوای لێبوردن دەکەین، ماددەکە نەدۆزرایەوە. دڵنیا ببەوە لە ڕێنووسەکەی.")
+        with st.spinner('خەریکی گەڕانم لە داتابەیسی زانستی...'):
+            data = get_data(query)
+            if data:
+                st.success(f"زانیاری بۆ '{data['Title']}' دۆزرایەوە:")
+                df = pd.DataFrame([data])
+                st.table(df)
+            else:
+                st.error(f"ئای! ماددەی '{query}' نەدۆزرایەوە. دڵنیا ببەوە لە ناوی دروستی ماددەکە (بە ئینگلیزی).")
     else:
         st.warning("تکایە ناوی ماددەیەک بنووسە.")

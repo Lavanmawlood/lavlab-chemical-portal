@@ -8,16 +8,13 @@ import io
 # ڕێکخستنی سەرەتایی لاپەڕەکە
 st.set_page_config(page_title="LAV LAB - Advanced Chemical Portal", layout="wide")
 
-# دەرزی لێدانی CSS بۆ دروستکردنی ڕێک ئەو دیزاینە تێر و مۆدێرنەی ناو image_14.png
+# دەرزی لێدانی CSS بۆ دروستکردنی دیزاینە تاریک و پرۆفیشناڵەکە
 st.markdown("""
     <style>
-    /* گۆڕینی ڕەنگی باکگراوند بۆ نیودارکێکی تێر */
     .stApp {
         background-color: #0d1117;
         color: #c9d1d9;
     }
-    
-    /* ستایلکردنی کارتەکان و چوارگۆشەکان */
     .stTextInput>div>div>input {
         background-color: #161b22 !important;
         color: #ffffff !important;
@@ -25,8 +22,6 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 10px !important;
     }
-    
-    /* ستایلی دوگمەی کێشانی داتا بە ڕەنگی بنەوشەیی/شینی مۆدێرن */
     .stButton>button {
         background-color: #4f46e5 !important;
         color: white !important;
@@ -36,30 +31,22 @@ st.markdown("""
         font-weight: bold !important;
         width: 100% !important;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
     }
-    
     .stButton>button:hover {
         background-color: #4338ca !important;
         transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
     }
-    
-    /* ستایلکردنی تایتڵ و سەردێڕەکان */
     h1 {
         color: #ffffff !important;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         text-align: center;
-        margin-bottom: 25px !important;
     }
     </style>
-""", unsafe_re Taylor=True)
+""", unsafe_allow_html=True)
 
 # ناوەڕۆکی ئەپەکە
 st.title("🧪 LAV LAB: Enterprise Chemical Data Portal")
 st.markdown("<p style='text-align: center; color: #8b949e;'>ناوی پێکهاتە کیمیاییەکان بە ئینگلیزی بنووسە بۆ ڕاکێشانی دەستبەجێی زانیارییە مۆلیکوڵییەکان.</p>", unsafe_allow_html=True)
 
-# بەشی ڕێکخستنی داواکاری لە ناو کارتێکی تاریکدا
 st.markdown("<div style='background-color: #161b22; padding: 20px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 20px;'>", unsafe_allow_html=True)
 compounds_input = st.text_input(
     "ناوی ماددەکان بنووسە (بۆ نموونە: Retinol, Salicylic acid):", 

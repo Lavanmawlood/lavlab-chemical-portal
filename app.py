@@ -1,8 +1,8 @@
 import streamlit as st
-import requests
 import pandas as pd
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
+import json
+import urllib.request
+import urllib.parse
 import io
 
 st.set_page_config(page_title="LAV LAB - Advanced Chemical Portal", layout="wide")
@@ -23,7 +23,6 @@ st.markdown("""
 st.title("🧪 LAV LAB: Enterprise Chemical Data Portal")
 st.markdown("<p style='text-align: center; color: #8b949e; font-size: 16px;'>سیستمی پێشکەوتووی کێشانی زانیاری مۆلیکۆڵی و بایۆکیمیایی پێکهاتەکان</p>", unsafe_allow_html=True)
 
-# بەشی تێپەڕاندنی ناوەکان
 compounds_input = st.text_input("ناوی پێکهاتەکان بنووسە (بە فاریزە جیایان بکەرەوە):", "Niacinamide, Malic acid, Retinol")
 
 if st.button("🚀 شیکردنەوەی مۆلیکۆڵی / Run Molecular Analysis"):
@@ -33,59 +32,56 @@ if st.button("🚀 شیکردنەوەی مۆلیکۆڵی / Run Molecular Analysi
     if not compound_list:
         st.error("تکایە لانی کەم ناوی ماددەیەکی دروست بنووسە!")
     else:
-        session = requests.Session()
-        retries = Retry(total=5, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
-        session.mount("https://", HTTPAdapter(max_retries=retries))
-        
         extracted_data = []
         progress_bar = st.progress(0)
         
         for index, compound in enumerate(compound_list):
-            clean_name = requests.utils.quote(compound)
+            # خاوێنکردنەوەی ناوەکە بۆ ڕێگریکردن لە کێشەی بۆشایی
+            clean_name = urllib.parse.quote(compound)
             cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/cids/JSON"
             
             try:
-                cid_res = session.get(cid_url, timeout=10)
-                if cid_res.status_code == 200:
-                    cid = cid_res.json()["IdentifierList"]["CID"][0]
+                # ناردنی داواکاری بە وێنەیەکی جێگیر و خێرا بەبێ Session
+                req = urllib.request.Request(cid_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=8) as response:
+                    data = json.loads(response.read().decode())
+                    cid = data["IdentifierList"]["CID"][0]
                     
-                    # ڕاکێشانی داتای قووڵتر (زیادکردنی XLogP3 بۆ پشکنینی Skin Barrier)
-                    properties = ["Title", "MolecularFormula", "MolecularWeight", "CanonicalSMILES", "IUPACName", "XLogP3"]
-                    prop_str = ",".join(properties)
-                    prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/{prop_str}/JSON"
-                    
-                    prop_res = session.get(prop_url, timeout=10)
-                    if prop_res.status_code == 200:
-                        prop_data = prop_res.json()["PropertyTable"]["Properties"][0]
-                        extracted_data.append(prop_data)
-                        
-                        # دروستکردنی کارت بۆ هەر ماددەیەک پێکەوە لەگەڵ وێنەی مۆلیکوڵەکە
-                        st.markdown(f"""
-                        <div class="chem-card">
-                            <div class="chem-title">🔬 {prop_data.get('Title', compound)}</div>
-                            <p><b>Formula:</b> {prop_data.get('MolecularFormula', 'N/A')}</p>
-                            <p><b>Molecular Weight:</b> {prop_data.get('MolecularWeight', 'N/A')} g/mol</p>
-                            <p><b>LogP (Skin Penetration Index):</b> {prop_data.get('XLogP3', 'N/A')} <small>(سەروو 3 یانی زۆر چەوری دۆستە)</small></p>
-                            <p><b>IUPAC Name:</b> <small>{prop_data.get('IUPACName', 'N/A')}</small></p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # پیشاندانی وێنەی مۆلیکوڵ لە PubChem بە شێوازی گرافیکی
-                        img_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG"
-                        st.image(img_url, width=200, caption=f"2D Molecular Structure of {compound}")
-                        st.markdown("---")
-                else:
-                    st.error(f"❌ ماددەی '{compound}' نەدۆزرایەوە. تکایە سپێڵینگەکەی چێک بکەرەوە (بۆ نموونە Malic acid لە جیاتی Melic acid).")
+                # ڕاکێشانی داتای بایۆکیمیایی پێشکەوتوو
+                properties = ["Title", "MolecularFormula", "MolecularWeight", "CanonicalSMILES", "IUPACName", "XLogP3"]
+                prop_str = ",".join(properties)
+                prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/{prop_str}/JSON"
+                
+                req_prop = urllib.request.Request(prop_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req_prop, timeout=8) as response_prop:
+                    prop_data = json.loads(response_prop.read().decode())["PropertyTable"]["Properties"][0]
+                    extracted_data.append(prop_data)
+                
+                # پیشاندانی زانیارییەکان لە ناو کارتی فەرمی دیزاینکراو
+                st.markdown(f"""
+                <div class="chem-card">
+                    <div class="chem-title">🔬 {prop_data.get('Title', compound)}</div>
+                    <p><b>Formula (فۆرمۆلا):</b> {prop_data.get('MolecularFormula', 'N/A')}</p>
+                    <p><b>Molecular Weight (کێشی مۆلیکۆڵی):</b> {prop_data.get('MolecularWeight', 'N/A')} g/mol</p>
+                    <p><b>LogP (تێپەڕبوونی پێست):</b> {prop_data.get('XLogP3', 'N/A')} <small>(ئاماژەیە بۆ چەوری-دۆستی)</small></p>
+                    <p><b>IUPAC Name:</b> <small>{prop_data.get('IUPACName', 'N/A')}</small></p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # کێشانی وێنەی مۆلیکوڵ بە شێوازێکی پارێزراو
+                img_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG"
+                st.image(img_url, width=200, caption=f"2D Structure of {compound}")
+                st.markdown("---")
+                
             except Exception as e:
-                st.error(f"Error analyzing {compound}: {str(e)}")
+                st.error(f"⚠️ پێکهاتەی '{compound}' کێشەیەکی لە گەڕاندا هەیە یان نەدۆزرایەوە. دڵنیا بەرەوە لە ڕێنووسەکەی.")
                 
             progress_bar.progress((index + 1) / len(compound_list))
             
         if extracted_data:
             df = pd.DataFrame(extracted_data)
-            st.success("🏆 تەواوی شیکارییەکان کۆتاییان هات!")
+            st.success("🏆 تەواوی شیکارییەکان بە سەرکەوتوویی کۆتاییان هات!")
             
-            # بەشی خشتەی گشتی بۆ هەناردەکردن
             with st.expander("📊 بینینی خشتەی گشتی داتاکان"):
                 st.dataframe(df, use_container_width=True)
             

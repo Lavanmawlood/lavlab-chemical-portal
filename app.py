@@ -2,62 +2,39 @@
 import streamlit as st
 import pandas as pd
 import requests
-from fake_useragent import UserAgent
 
-# ڕێکخستنی لاپەڕەکە
 st.set_page_config(page_title="LAV LAB - Chemical Data", layout="wide")
 st.title("🧪 LAV LAB: Molecular Data Engine")
 
-# دروستکردنی Session
-session = requests.Session()
-ua = UserAgent()
-
 def get_molecular_data(name):
-    name = name.strip()
-    
-    # هەر جارەی ناسنامەیەکی نوێ و ڕاستەقینە بۆ سێرڤەر دەنێرین
-    headers = {"User-Agent": ua.random}
-    
-    # هەنگاوی ١: دۆزینەوەی CID
-    cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/cids/JSON"
+    # ١. سەرەتا گەڕان بۆ ناسنامەی ماددەکە (CID)
+    # ئەمە ڕێگایەکی زۆر سەقامگیرترە
+    search_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/cids/TXT"
     
     try:
-        response = session.get(cid_url, headers=headers, timeout=15)
-        if response.status_code != 200:
-            return None, f"نەتوانرا ناوی '{name}' لە PubChem بدۆزرێتەوە (هەڵەی: {response.status_code})"
+        res = requests.get(search_url, timeout=10)
+        if res.status_code != 200:
+            return None, "نەتوانرا ناوی ماددەکە بدۆزرێتەوە."
         
-        data = response.json()
-        if "IdentifierList" not in data or "CID" not in data["IdentifierList"]:
-            return None, "ئەم ماددەیە لە داتابەیسدا نەدۆزرایەوە."
-            
-        cid = data["IdentifierList"]["CID"][0]
+        cid = res.text.strip()
         
-        # هەنگاوی ٢: بەدەستهێنانی زانیارییەکان بە CID
-        prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
-        prop_res = session.get(prop_url, headers=headers, timeout=15)
-        prop_data = prop_res.json()
+        # ٢. پاشان هێنانی زانیاری بە بەکارهێنانی CID
+        data_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
+        prop_res = requests.get(data_url, timeout=10)
         
-        if "PropertyTable" in prop_data and "Properties" in prop_data["PropertyTable"]:
-            return prop_data["PropertyTable"]["Properties"][0], None
-        else:
-            return None, "زانیارییەکان بۆ ئەم ماددەیە بەردەست نین."
+        return prop_res.json()["PropertyTable"]["Properties"][0], None
             
     except Exception as e:
-        return None, f"هەڵەی تەکنیکی: {str(e)}"
+        return None, "کێشەیەک ڕوویدا لە وەرگرتنی داتا."
 
-# بەشی بەکارهێنەر
-ingredient = st.text_input("ناوی ماددە (بە ئینگلیزی، بۆ نموونە: Niacinamide):")
+ingredient = st.text_input("ناوی ماددە (ئینگلیزی):")
 
-if st.button("شیکردنەوەی زانستی"):
+if st.button("شیکردنەوە"):
     if ingredient:
-        with st.spinner('خەریکی پرۆسێسکردنی ماددەکەم...'):
-            data, error = get_molecular_data(ingredient)
-            if data:
-                st.success("سەرکەوتوو بوو!")
-                df = pd.DataFrame([data])
-                st.table(df)
-            else:
-                st.error(f"کێشەیەک ڕوویدا: {error}")
-    else:
-        st.warning("تکایە ناوی ماددەیەک بنووسە.")
+        data, error = get_molecular_data(ingredient)
+        if data:
+            st.table(pd.DataFrame([data]))
+        else:
+            st.error(error)
+
 

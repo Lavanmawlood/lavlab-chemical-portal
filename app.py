@@ -1,49 +1,52 @@
 
-import streamlit as st
+Import streamlit as st
 import pandas as pd
 import json
 import urllib.request
 import urllib.parse
 
 st.set_page_config(page_title="LAV LAB - Chemical Data", layout="wide")
-st.title("🧪 LAV LAB: Molecular Data Professional")
+st.title("🧪 LAV LAB: Molecular Data Engine")
 
-# بەکارهێنانی هێدەری Browser ی ڕاستەقینە بۆ ئەوەی بلۆک نەبیت
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+# ئەم هێدەرە وادەکات سێرڤەرەکە وەک وێبگەڕێکی ئاسایی (وەک کرۆم) بتناسێت
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-def get_data(name):
+def fetch_pubchem(name):
     clean_name = urllib.parse.quote(name.strip())
-    # URL بۆ کێشانی داتا
-    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
+    # URL بۆ وەرگرتنی CID
+    cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/cids/JSON"
     
     try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=15) as response:
-            res = json.loads(response.read().decode('utf-8'))
-            props = res["PropertyTable"]["Properties"][0]
-            return {
-                "Title": props.get("Title", name),
-                "Formula": props.get("MolecularFormula", "N/A"),
-                "Weight": f"{props.get('MolecularWeight', 'N/A')} g/mol",
-                "LogP": props.get("XLogP3", "N/A")
-            }
+        req = urllib.request.Request(cid_url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            cid_data = json.loads(response.read().decode('utf-8'))
+            cid = cid_data["IdentifierList"]["CID"][0]
+            
+        # URL بۆ وەرگرتنی تایبەتمەندییەکان
+        prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
+        req_prop = urllib.request.Request(prop_url, headers=HEADERS)
+        with urllib.request.urlopen(req_prop, timeout=10) as response_prop:
+            prop_data = json.loads(response_prop.read().decode('utf-8'))
+            return {"status": "success", "data": prop_data["PropertyTable"]["Properties"][0]}
+            
     except Exception as e:
-        # ئەگەر کێشەی پەیوەندی هەبوو، لێرەدا دەگەڕێتەوە
-        return None
+        return {"status": "error", "message": str(e)}
 
-query = st.text_input("ناوی ماددە بنووسە (بۆ نموونە: Niacinamide, Retinol):")
+ingredient_input = st.text_input("ناوی ماددەکە بنووسە (بۆ نموونە: Niacinamide):")
 
 if st.button("شیکردنەوە"):
-    if query:
-        with st.spinner('خەریکی پەیوەندیکردنم بە داتابەیسی پوبچێم...'):
-            data = get_data(query)
-            if data:
-                st.success(f"زانیاری بۆ '{data['Title']}' دۆزرایەوە:")
-                df = pd.DataFrame([data])
+    if ingredient_input:
+        with st.spinner('کۆکردنەوەی زانیارییەکان لە PubChem...'):
+            result = fetch_pubchem(ingredient_input)
+            
+            if result["status"] == "success":
+                st.success("داتاکان دۆزرانەوە:")
+                df = pd.DataFrame([result["data"]])
                 st.table(df)
+                
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 داگرتنی داتا وەک CSV", csv, "chemical_data.csv", "text/csv")
             else:
-                st.error(f"ئای! نەتوانرا پەیوەندی بە پوبچێم بکرێت یان ماددەکە نەدۆزرایەوە. تکایە دووبارە تاقی بکەرەوە.")
+                st.error("نەتوانرا زانیاری بۆ ئەم ماددەیە بدۆزرێتەوە، دڵنیا ببەوە لە ناوی دروستی ماددەکە.")
     else:
         st.warning("تکایە ناوی ماددەیەک بنووسە.")

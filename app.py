@@ -2,43 +2,42 @@
 import streamlit as st
 import pandas as pd
 import requests
-import urllib.parse
 
+# دیزاینی وێبگەڕ
 st.set_page_config(page_title="LAV LAB - Chemical Data", layout="wide")
 st.title("🧪 LAV LAB: Molecular Data Engine")
 
 # دروستکردنی Session بۆ بەهێزکردنی پەیوەندییەکان
 session = requests.Session()
-session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+session.headers.update({"User-Agent": "Mozilla/5.0"})
 
 def get_molecular_data(name):
-    # پاککردنەوەی ناو
     name = name.strip()
-    clean_name = urllib.parse.quote(name)
     
-    # هەنگاوی ١: دۆزینەوەی CID
-    cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{clean_name}/cids/JSON"
+    # هەنگاوی ١: دۆزینەوەی CID بە بەکارهێنانی PUG REST
+    # تێبینی: پەیڕەوی 'name_to_cid' باشترە لە گەڕانی گشتی
+    cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/cids/JSON"
+    
     try:
-        cid_res = session.get(cid_url, timeout=10)
-        # ئەگەر 404 بوو واتە ناوی ماددەکە هەڵەیە یان PubChem ناناسێت
-        if cid_res.status_code != 200:
-            return None, f"نەتوانرا ناوی '{name}' لە PubChem بدۆزرێتەوە."
+        response = session.get(cid_url, timeout=15)
+        if response.status_code != 200:
+            return None, f"نەتوانرا ناوی '{name}' لە PubChem بدۆزرێتەوە (هەڵەی: {response.status_code})"
         
-        cid_data = cid_res.json()
-        if "IdentifierList" not in cid_data or not cid_data["IdentifierList"].get("CID"):
-            return None, "ئەم ماددەیە لە داتابەیسدا نییە."
+        data = response.json()
+        if "IdentifierList" not in data or "CID" not in data["IdentifierList"]:
+            return None, "ئەم ماددەیە لە داتابەیسدا نەدۆزرایەوە."
             
-        cid = cid_data["IdentifierList"]["CID"][0]
+        cid = data["IdentifierList"]["CID"][0]
         
-        # هەنگاوی ٢: بەدەستهێنانی زانیارییەکان
+        # هەنگاوی ٢: بەدەستهێنانی زانیارییەکان بە CID
         prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
-        prop_res = session.get(prop_url, timeout=10)
+        prop_res = session.get(prop_url, timeout=15)
         prop_data = prop_res.json()
         
-        if "PropertyTable" in prop_data:
+        if "PropertyTable" in prop_data and "Properties" in prop_data["PropertyTable"]:
             return prop_data["PropertyTable"]["Properties"][0], None
         else:
-            return None, "زانیارییەکان بۆ ئەم ماددەیە بەردەست نین."
+            return None, "زانیارییەکان بۆ ئەم ماددەیە بەردەست نین، تکایە ناوی ماددەیەکی تر تاقیبکەرەوە."
             
     except Exception as e:
         return None, f"هەڵەی تەکنیکی: {str(e)}"
@@ -52,9 +51,13 @@ if st.button("شیکردنەوەی زانستی"):
             data, error = get_molecular_data(ingredient)
             if data:
                 st.success("سەرکەوتوو بوو!")
-                # نمایشکردنی داتا بە ستایڵێکی جوان
-                st.table(pd.DataFrame([data]))
+                # نمایشکردنی داتا بە خشتە
+                df = pd.DataFrame([data])
+                st.table(df)
             else:
-                st.error(error)
+                # نیشاندانی هەڵە بە شێوەیەکی جوان
+                st.error(f"کێشەیەک ڕوویدا: {error}")
+    else:
+        st.warning("تکایە ناوی ماددەیەک بنووسە.")
 
 

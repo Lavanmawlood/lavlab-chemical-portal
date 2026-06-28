@@ -1,6 +1,7 @@
+      - uses: actions/checkout@v3
       - name: Push to HF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add space https://huggingface.co/spaces/Lavanmawlood/lavlab-chemical-portal
+          git remote add space https://$HF_TOKEN@huggingface.co/spaces/Lavanmawlood/lavlab-chemical-portal
           git push -f space main

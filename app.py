@@ -2,39 +2,38 @@
 import streamlit as st
 import pandas as pd
 import requests
+import urllib.parse
 
-st.set_page_config(page_title="LAV LAB - Chemical Data", layout="wide")
+# ڕێکخستنی لاپەڕە
+st.set_page_config(page_title="LAV LAB - Chemical Data", layout="centered")
 st.title("🧪 LAV LAB: Molecular Data Engine")
 
-def get_molecular_data(name):
-    # ١. سەرەتا گەڕان بۆ ناسنامەی ماددەکە (CID)
-    # ئەمە ڕێگایەکی زۆر سەقامگیرترە
-    search_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/cids/TXT"
+@st.cache_data(ttl=86400)
+def fetch_data(name):
+    # پاککردنەوەی ناوی ماددەکە
+    safe_name = urllib.parse.quote(name.strip())
+    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{safe_name}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
     
     try:
-        res = requests.get(search_url, timeout=10)
-        if res.status_code != 200:
-            return None, "نەتوانرا ناوی ماددەکە بدۆزرێتەوە."
+        # بەکارهێنانی User-Agent بۆ ئەوەی وەک ڕۆبۆت دەرنەکەوین
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
         
-        cid = res.text.strip()
-        
-        # ٢. پاشان هێنانی زانیاری بە بەکارهێنانی CID
-        data_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
-        prop_res = requests.get(data_url, timeout=10)
-        
-        return prop_res.json()["PropertyTable"]["Properties"][0], None
-            
+        if response.status_code == 200:
+            return response.json()["PropertyTable"]["Properties"][0]
     except Exception as e:
-        return None, "کێشەیەک ڕوویدا لە وەرگرتنی داتا."
+        return None
+    return None
 
-ingredient = st.text_input("ناوی ماددە (ئینگلیزی):")
-
-if st.button("شیکردنەوە"):
-    if ingredient:
-        data, error = get_molecular_data(ingredient)
-        if data:
-            st.table(pd.DataFrame([data]))
-        else:
-            st.error(error)
-
+# دیزاینی ناوەوە
+name = st.text_input("ناوی ماددە (بە ئینگلیزی) بنووسە:")
+if st.button("شیکردنەوەی زانستی"):
+    if name:
+        with st.spinner('خەریکی پرۆسێسکردنم...'):
+            data = fetch_data(name)
+            if data:
+                st.success("سەرکەوتوو بوو:")
+                st.table(pd.DataFrame([data]))
+            else:
+                st.error("ماددەکە نەدۆزرایەوە، دڵنیابە لە ناوەکە (بە ئینگلیزی بێت).")
 

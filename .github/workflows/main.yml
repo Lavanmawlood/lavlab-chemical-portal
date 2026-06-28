@@ -11,4 +11,5 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push https://oauth2:$HF_TOKEN@huggingface.co/spaces/Lavanmawlood/lavlab-chemical-portal main --force
+          git push https://oauth2:$HF_TOKEN@huggingface.co/spaces/Lavanmawlood/Lavlab-chimical-portal main --force
+

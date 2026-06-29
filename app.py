@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -45,4 +45,4 @@ if st.button("شیکردنەوە"):
     else:
         st.warning("تکایە ناوی ماددەیەک بنووسە.")
 
-```
+

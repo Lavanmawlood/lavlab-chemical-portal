@@ -2,38 +2,58 @@
 import streamlit as st
 import pandas as pd
 import requests
-import urllib.parse
+import sqlite3
+import os
 
-# ڕێکخستنی لاپەڕە
-st.set_page_config(page_title="LAV LAB - Chemical Data", layout="centered")
-st.title("🧪 LAV LAB: Molecular Data Engine")
+# ١. دامەزراندنی داتابەیس
+def init_db():
+    conn = sqlite3.connect('chemical_data.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS chemicals 
+                 (name TEXT PRIMARY KEY, data TEXT)''')
+    conn.commit()
+    conn.close()
 
-@st.cache_data(ttl=86400)
-def fetch_data(name):
-    # پاککردنەوەی ناوی ماددەکە
-    safe_name = urllib.parse.quote(name.strip())
-    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{safe_name}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON"
+init_db()
+
+# ٢. پشکنینی داتابەیس یان API
+def get_chemical(name):
+    name = name.lower().strip()
+    conn = sqlite3.connect('chemical_data.db')
+    c = conn.cursor()
+    c.execute("SELECT data FROM chemicals WHERE name=?", (name,))
+    row = c.fetchone()
+    
+    if row:
+        conn.close()
+        return pd.read_json(row[0]) # گەڕاندنەوەی داتا لە داتابەیس
+    
+    # ئەگەر لە داتابەیس نەبوو، بچۆ بۆ API
+    api_key = os.environ.get("PUBCHEM_API_KEY")
+    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/property/Title,MolecularFormula,MolecularWeight,XLogP3/JSON?api_key={api_key}"
     
     try:
-        # بەکارهێنانی User-Agent بۆ ئەوەی وەک ڕۆبۆت دەرنەکەوین
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            return response.json()["PropertyTable"]["Properties"][0]
-    except Exception as e:
-        return None
+            data = response.json()["PropertyTable"]["Properties"][0]
+            df = pd.DataFrame([data])
+            # سەیڤکردنی لە داتابەیس بۆ جارانی داهاتوو
+            c.execute("INSERT INTO chemicals VALUES (?, ?)", (name, df.to_json()))
+            conn.commit()
+            conn.close()
+            return df
+    except:
+        pass
+    conn.close()
     return None
 
-# دیزاینی ناوەوە
-name = st.text_input("ناوی ماددە (بە ئینگلیزی) بنووسە:")
-if st.button("شیکردنەوەی زانستی"):
-    if name:
-        with st.spinner('خەریکی پرۆسێسکردنم...'):
-            data = fetch_data(name)
-            if data:
-                st.success("سەرکەوتوو بوو:")
-                st.table(pd.DataFrame([data]))
-            else:
-                st.error("ماددەکە نەدۆزرایەوە، دڵنیابە لە ناوەکە (بە ئینگلیزی بێت).")
-
+# دیزاینی ئەپەکە
+st.title("🧪 LAV LAB: Molecular Engine")
+name = st.text_input("ناوی ماددە بنووسە:")
+if st.button("شیکردنەوە"):
+    with st.spinner('خەریکی گەڕانم...'):
+        result = get_chemical(name)
+        if result is not None:
+            st.table(result)
+        else:
+            st.error("ماددەکە نەدۆزرایەوە.")

@@ -3,37 +3,27 @@ import streamlit as st
 import os
 from pymongo import MongoClient
 
-# بەکارهێنانی ژینگەی نهێنی بۆ پاراستنی پاسۆردەکەت
-# دڵنیابە لە Hugging Face لە بەشی Secrets ناوی MONGO_URI-ت بەکارهێناوە
-MONGO_URI = os.getenv("MONGO_URI")
-
-@st.cache_resource
-def get_db():
-    try:
-        client = MongoClient(MONGO_URI)
-        # لێرە ناوی داتابەیس و کۆڵێکشنەکەت دیاری بکە
-        return client['LAV_LAB']['chemicals']
-    except Exception as e:
-        st.error(f"هەڵە لە پەیوەندی کردن بە داتابەیس: {e}")
-        return None
-
-db = get_db()
+# بەکارهێنانی کلیلە نهێنییەکەی Hugging Face
+mongo_uri = os.getenv("MONGO_URI")
 
 st.title("🧪 LAV LAB: Molecular Engine")
-st.write("بەخێر بێن بۆ سیستەمی شیکردنەوەی ماددە کیمیاییەکان")
 
-ingredient = st.text_input("ناوی ماددە (بە ئینگلیزی):")
-
-if st.button("شیکردنەوە"):
-    if ingredient and db is not None:
-        # گەڕان لەناو MongoDB بە شێوەیەکی زیرەک
-        result = db.find_one({'Title': {'$regex': ingredient, '$options': 'i'}})
+if not mongo_uri:
+    st.error("تکایە MONGO_URI لە بەشی Secrets-ی Hugging Face دابنێ!")
+else:
+    try:
+        # پەیوەندی کردن بە داتابەیس
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client['LAV_LAB']['chemicals']
+        st.success("پەیوەندی بە داتابەیسەوە سەرکەوتوو بوو!")
         
-        if result:
-            st.success("داتاکە دۆزرایەوە!")
-            st.json(result)
-        else:
-            st.error("ئەم ماددەیە لە داتابەیسدا نییە. تکایە پێشتر لە ڕێگەی سکراپەرەکەتەوە داتاکەی تێ بکە.")
-    elif not ingredient:
-        st.warning("تکایە ناوی ماددەیەک بنووسە.")
+        ingredient = st.text_input("ناوی ماددە (بە ئینگلیزی):")
+        if st.button("شیکردنەوە"):
+            result = db.find_one({'Title': {'$regex': ingredient, '$options': 'i'}})
+            if result:
+                st.write(result)
+            else:
+                st.error("ماددەکە نەدۆزرایەوە.")
+    except Exception as e:
+        st.error(f"هەڵە: {e}")
 

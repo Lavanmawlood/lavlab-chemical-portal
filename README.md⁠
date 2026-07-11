@@ -1,10 +1,10 @@
----
-title: LAVLAB Chemical Portal
-emoji: 🧪
-colorFrom: blue
-colorTo: green
-sdk: streamlit
-sdk_version: 1.20.0
-app_file: app.py
+title: "LAVLAB Chemical Portal"
+emoji: "🧪"
+colorFrom: "blue"
+colorTo: "green"
+sdk: "streamlit"
+sdk_version: "1.29.0"
+app_file: "app.py"
 pinned: false
----
+🧪 LAVLAB Chemical Portal
+ئەم ئەپە بۆ شیکردنەوەی زانستی ماددە کیمیاییەکانە.
